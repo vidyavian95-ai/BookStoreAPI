@@ -1,0 +1,22 @@
+meta {
+  name: Get Book
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://localhost:8080/api/bookstoreapi
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "author": "Bruno",
+    "title" :  "Developer friendly api"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

@@ -1,0 +1,45 @@
+meta {
+  name: SaveAuthor
+  type: http
+  seq: 5
+}
+
+post {
+  url: http://localhost:8080/api/author
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "name": "George R.R. Martin",
+    "address": "Santa Fe, USA",
+    "phoneNo": "+15055551234",
+    "title": "Mr.",
+    "books": [
+      {
+        "title": "A Game of Thrones",
+        "description": "First book in A Song of Ice and Fire",
+        "genre": "Fantasy",
+        "publication_date": "1996-08-06"
+      },
+      {
+        "title": "A Clash of Kings",
+        "description": "Second book",
+        "genre": "Fantasy",
+        "publication_date": "1998-11-16"
+      }
+    ]
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

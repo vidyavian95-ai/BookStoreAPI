@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven3'
+    }
+
+    environment {
+        APP_NAME = "java-api"
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main',
+                url: 'https://github.com/Devops12389/Demo_Devops.git'
+            }
+        }
+
+        stage('Build Application') {
+            steps {
+                bat 'mvn clean install'
+            }
+        }
+
+        stage('Run Unit Tests') {
+            steps {
+                bat 'mvn test'
+            }
+        }
+
+        stage('Archive JAR') {
+            steps {
+                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo 'Build completed successfully'
+        }
+
+        failure {
+            echo 'Build failed'
+        }
+
+        always {
+            cleanWs()
+        }
+    }
+}
