@@ -10,7 +10,7 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 git branch: 'main',
-                url: 'https://github.com/Devops12389/Demo_Devops.git'
+                url: 'https://github.com/vidyavian95-ai/BookStoreAPI.git'
             }
         }
 
