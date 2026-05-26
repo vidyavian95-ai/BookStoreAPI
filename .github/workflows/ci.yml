@@ -69,8 +69,10 @@ jobs:
           REPOSITORY: bookstoreapi_pub
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG .
-          docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG
+          docker build -t public.ecr.aws/m6l6l2p5/demodevops/bookstoreapi_pub:$IMAGE_TAG .
+          docker push public.ecr.aws/m6l6l2p5/demodevops/bookstoreapi_pub:$IMAGE_TAG
+        #  docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG
+          
 
 
       - name: Upload artifact
