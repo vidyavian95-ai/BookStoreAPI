@@ -73,7 +73,7 @@ jobs:
           docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG
 
       - name: Deploy to EB
-        uses: aws-actions/aws-elasticbeanstalk-deploy@v1
+        uses: aws-actions/aws-elasticbeanstalk-deploy@v1.0.2
         with:
             application_name: "demo-9271-2087-0716-bookstoreapi"
             environment_name: "Demo-9271-2087-0716-bookstoreapi-env"
