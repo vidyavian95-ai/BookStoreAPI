@@ -78,7 +78,7 @@ jobs:
             application_name: "demo-9271-2087-0716-bookstoreapi"
             environment_name: "Demo-9271-2087-0716-bookstoreapi-env"
             version_label: ${{ github.sha }}
-            region: "ap-south-1"
+            aws-region: "ap-south-1"
             deployment_package: Dockerrun.aws.json
       
       
