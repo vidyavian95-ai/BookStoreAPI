@@ -1,0 +1,13 @@
+{
+    "AWSEBDockerrunVersion": "1",
+    "Image": {
+      "Name": "927120870716.dkr.ecr.ap-south-1.amazonaws.com/demodevops/bookstoreapi:${{ github.sha }}",
+      "Update": "true"
+    },
+    "Ports": [
+      {
+        "ContainerPort": 8080
+      }
+    ]
+  }
+  

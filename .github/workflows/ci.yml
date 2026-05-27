@@ -72,9 +72,13 @@ jobs:
           docker build -t $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG .
           docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG
 
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Deploy to EB
+        uses: aws-actions/aws-elasticbeanstalk-deploy@v1
         with:
-          name: bookstore_api
-          path: target/*.jar
+            application_name: "demo-9271-2087-0716-bookstoreapi"
+            environment_name: "Demo-9271-2087-0716-bookstoreapi-env"
+            version_label: ${{ github.sha }}
+            region: "ap-south-1"
+            deployment_package: Dockerrun.aws.json
+      
+      
