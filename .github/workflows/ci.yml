@@ -75,10 +75,10 @@ jobs:
       - name: Deploy to EB
         uses: aws-actions/aws-elasticbeanstalk-deploy@v1.0.2
         with:
-            application_name: "demo-9271-2087-0716-bookstoreapi"
-            environment_name: "Demo-9271-2087-0716-bookstoreapi-env"
-            version_label: ${{ github.sha }}
+            application-name: "demo-9271-2087-0716-bookstoreapi"
+            environment-name: "Demo-9271-2087-0716-bookstoreapi-env"
+            version-label: ${{ github.sha }}
             aws-region: "ap-south-1"
-            deployment_package: Dockerrun.aws.json
+            deployment-package: Dockerrun.aws.json
       
       
