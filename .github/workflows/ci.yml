@@ -48,7 +48,6 @@ jobs:
             -Dsonar.projectName=BookStoreAPI
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
 
     #  - name: Java installation
