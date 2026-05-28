@@ -50,6 +50,13 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
+      - name: Build with Maven
+        run: mvn -B verify spotbugs:spotbugs
+      
+      - uses: lcollins/spotbugs-github-action@v3.2.0
+        with:
+            path: '**/spotbugsXml.xml'
+
 
     #  - name: Java installation
     #    uses: actions/setup-java@v4
