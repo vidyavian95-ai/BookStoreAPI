@@ -40,9 +40,15 @@ jobs:
         run: ls -lrt && pwd
 
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v4 # Official SonarQube Scan Action
+        uses: SonarSource/sonarqube-scan-action@v4
+        with:
+          args: >
+            -Dsonar.organization=vidyavian95-ai
+            -Dsonar.projectName=BookStoreAPI
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
 
     #  - name: Java installation
     #    uses: actions/setup-java@v4
