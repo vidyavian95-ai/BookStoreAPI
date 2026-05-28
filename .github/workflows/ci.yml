@@ -39,6 +39,11 @@ jobs:
       - name: verify dir
         run: ls -lrt && pwd
 
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v4 # Official SonarQube Scan Action
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
     #  - name: Java installation
     #    uses: actions/setup-java@v4
     #    with:
