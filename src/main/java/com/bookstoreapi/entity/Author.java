@@ -5,6 +5,8 @@ import lombok.*;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
@@ -31,5 +33,6 @@ public class Author {
 
     // One Author → Many Books
     @OneToMany(mappedBy = "author", cascade = CascadeType.ALL)
+    @JsonManagedReference
     private List<Book> books;
 }

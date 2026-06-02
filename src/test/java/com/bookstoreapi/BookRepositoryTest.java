@@ -7,7 +7,9 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import com.bookstoreapi.entity.Book;
 import com.bookstoreapi.repository.BookRepository;
+import org.springframework.test.context.ActiveProfiles;
 
+@ActiveProfiles("test")
 @DataJpaTest
 public class BookRepositoryTest {
 
