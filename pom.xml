@@ -74,11 +74,7 @@
 			<artifactId>spring-kafka-test</artifactId>
 			<scope>test</scope>
 		</dependency> 
-		<dependency>
-    <groupId>com.h2database</groupId>
-    <artifactId>h2</artifactId>
-    <scope>test</scope>
-</dependency>
+	
 		<dependency>
 			<groupId>io.github.resilience4j</groupId>
 			<artifactId>resilience4j-spring-boot3</artifactId> <!-- Or resilience4j-spring-boot2 for Spring Boot 2.x -->
@@ -116,6 +112,22 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+
+			<plugin>
+    <groupId>com.github.spotbugs</groupId>
+    <artifactId>spotbugs-maven-plugin</artifactId>
+    <version>4.8.6.6</version>
+	 <configuration>
+        <failOnError>false</failOnError>
+    </configuration>
+    <executions>
+        <execution>
+            <goals>
+                <goal>check</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
 		</plugins>
 	</build>
 </project>

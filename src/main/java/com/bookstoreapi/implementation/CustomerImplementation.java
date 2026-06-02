@@ -1,15 +1,17 @@
 package com.bookstoreapi.implementation;
 
+import java.util.Optional;
+
 import com.bookstoreapi.entity.Order;
 import com.bookstoreapi.repository.OrderRepository;
-import com.bookstoreapi.service.BillingService;
-
-import java.util.Optional;
 
 public class CustomerImplementation {
 
 
-    private OrderRepository orderRepository;
+    private final OrderRepository orderRepository;
+    public CustomerImplementation(OrderRepository orderRepository) {
+        this.orderRepository = orderRepository;
+    }
 
     public Order createOrder(Order order){
         return orderRepository.save(order);

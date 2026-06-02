@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 public class KafkaProducerService {
 
     @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate; // Or <String, MyObject> for custom objects
+    private final KafkaTemplate<String, String> kafkaTemplate; // Or <String, MyObject> for custom objects
 
     public KafkaProducerService(KafkaTemplate<String, String> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;

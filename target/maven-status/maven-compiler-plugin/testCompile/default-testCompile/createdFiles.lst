@@ -1,3 +1,4 @@
 com\bookstoreapi\BookControllerTest.class
 com\bookstoreapi\BookRepositoryTest.class
+com\bookstoreapi\BookServiceIntegrationTest.class
 com\bookstoreapi\BookServiceTest.class
