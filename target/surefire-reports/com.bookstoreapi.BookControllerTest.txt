@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.bookstoreapi.BookControllerTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.330 s -- in com.bookstoreapi.BookControllerTest
