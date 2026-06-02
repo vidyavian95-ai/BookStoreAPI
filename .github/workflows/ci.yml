@@ -99,5 +99,17 @@ jobs:
             version-label: ${{ github.sha }}
             aws-region: "ap-south-1"
             deployment-package: Dockerrun.aws.json
+
+      - name: deploy to EKs
+        run: |
+          aws eks update-kubeconfig --region ap-south-1 --name demo-eks-cluster
+          kubectl apply -f deployment/deployment.yaml
+          kubectl apply -f deployment/service.yaml
+          kubectl apply -f deployment/ingress.yaml
+
+      - name: Verify deployment
+        run: |
+          aws eks update-kubeconfig --region ap-south-1 --name demo-eks-cluster
+          kubectl get all
       
       

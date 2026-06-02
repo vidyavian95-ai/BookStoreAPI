@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bookstoreapi-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: tomcat-ingress
+  rules: 
+  - http:
+      paths: 
+      pathtype: Prefix
+      backend:
+        service:
+          name: bookstoreapi-service
+          port:
+            number: 80    
