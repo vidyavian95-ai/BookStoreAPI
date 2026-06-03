@@ -11,14 +11,20 @@ import org.springframework.transaction.annotation.Transactional;
 import com.bookstoreapi.Kafka.KafkaProducerService;
 import com.bookstoreapi.entity.Book;
 import com.bookstoreapi.service.BookService;
+import org.springframework.test.context.ActiveProfiles;
 
-
-@SpringBootTest
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:testdb",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.jpa.hibernate.ddl-auto=create-drop"
+    })
+@ActiveProfiles("test")
 @Transactional
 class BookServiceIntegrationTest {
 
     @Autowired
     private BookService service;
+    
      @MockBean
     private KafkaProducerService kafkaProducerService;
 
