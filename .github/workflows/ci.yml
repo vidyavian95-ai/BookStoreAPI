@@ -40,7 +40,7 @@ jobs:
         run: ls -lrt && pwd
 
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v4
+        uses: SonarSource/sonarqube-scan-action@v6
         with:
           args: >
             -Dsonar.organization=vidyavian95-ai
