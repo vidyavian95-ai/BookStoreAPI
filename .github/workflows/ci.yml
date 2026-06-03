@@ -71,7 +71,7 @@ jobs:
           cache-dependency-path: './bookstoreapi/pom.xml'
 
       - name: Maven build
-        run: mvn -B install --file pom.xml --DskipTests
+        run: mvn clean install -DskipTests
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6.1.0
