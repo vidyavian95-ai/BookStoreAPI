@@ -1,119 +1,106 @@
-name: java build pipeline
+name: Java CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
-
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
-
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
-  checkout:
+
+# -------------------------
+# 1. BUILD + TEST + ANALYSIS
+# -------------------------
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout src code
+      - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          name: bookstore_api_src_code
-          path: .
+          distribution: temurin
+          java-version: 21
+          cache: maven
 
-  build:
-    needs: checkout
-    runs-on: ubuntu-latest
-      
-    steps:  
-      - name: download src code
-        uses: actions/download-artifact@v4
-        with:
-          name: bookstore_api_src_code
-          path: .
+      # -------------------------
+      # Run Maven build + tests
+      # -------------------------
+      - name: Build & Run Tests
+        run: mvn clean verify -Dspring.profiles.active=test
 
-      - name: verify dir
-        run: ls -lrt && pwd
-
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v6
-        with:
-          args: >
-            -Dsonar.organization=vidyavian95-ai
-            -Dsonar.projectKey=vidyavian95-ai_BookStoreAPI
-            -Dsonar.projectName=BookStoreAPI
-            -Dsonar.java.binaries=target/classes 
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-      - name: Build with Maven
-        run: mvn clean verify com.github.spotbugs:spotbugs-maven-plugin:4.8.6.1:check
-
+      # -------------------------
+      # SpotBugs Analysis (after build)
+      # -------------------------
       - name: Run SpotBugs
-        run: mvn spotbugs:spotbugs
+        run: mvn com.github.spotbugs:spotbugs-maven-plugin:4.8.6.1:check
 
       - name: Upload SpotBugs Report
         uses: lcollins/spotbugs-github-action@v3.2.0
         with:
-            path: '**/spotbugsXml.xml'
+          path: '**/spotbugsXml.xml'
 
-
-      - name: Java installation
-        uses: actions/setup-java@v4
+      # -------------------------
+      # SonarQube Scan (AFTER build)
+      # -------------------------
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'maven'
-          cache-dependency-path: './bookstoreapi/pom.xml'
+          args: >
+            -Dsonar.projectKey=vidyavian95-ai_BookStoreAPI
+            -Dsonar.organization=vidyavian95-ai
+            -Dsonar.projectName=BookStoreAPI
+            -Dsonar.java.binaries=target/classes
 
-      - name: Maven build
-        run: mvn -B install --file pom.xml
+      # -------------------------
+      # Build Docker Image
+      # -------------------------
+      - name: Build Docker Image
+        run: |
+          docker build -t bookstoreapi:latest .
 
+      # -------------------------
+      # AWS Credentials
+      # -------------------------
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v6.1.0
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
+      # -------------------------
+      # Login to ECR
+      # -------------------------
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-
-      - name: Build, tag, and push docker image to Amazon ECR 
+      # -------------------------
+      # Build & Push Docker Image
+      # -------------------------
+      - name: Push Docker Image to ECR
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REGISTRY_ALIAS: demodevops
           REPOSITORY: bookstoreapi
           IMAGE_TAG: latest
         run: |
-          docker build -t $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest .
-          docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest
+          docker tag bookstoreapi:latest $REGISTRY/$REPOSITORY:$IMAGE_TAG
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
 
-      - name: Deploy to EB
-        uses: aws-actions/aws-elasticbeanstalk-deploy@v1.0.2
+      # -------------------------
+      # Deploy to Elastic Beanstalk
+      # -------------------------
+      - name: Deploy to Elastic Beanstalk
+        uses: aws-actions/aws-elasticbeanstalk-deploy@v1
         with:
-            application-name: "demo-9271-2087-0716-bookstoreapi"
-            environment-name: "Demo-9271-2087-0716-bookstoreapi-env"
-            version-label: ${{ github.sha }}
-            aws-region: "ap-south-1"
-            deployment-package: Dockerrun.aws.json
-
-      - name: deploy to EKs
-        run: |
-          aws eks update-kubeconfig --region ap-south-1 --name demo-eks-cluster
-          kubectl apply -f deployment/deployment.yaml
-          kubectl apply -f deployment/service.yaml
-          kubectl apply -f deployment/ingress.yaml
-
-      - name: Verify deployment
-        run: |
-          aws eks update-kubeconfig --region ap-south-1 --name demo-eks-cluster
-          kubectl get all
-      
-      
+          application-name: "demo-bookstoreapi"
+          environment-name: "demo-bookstoreapi-env"
+          version-label: ${{ github.sha }}
+          region: ap-south-1
+          deployment-package: Dockerrun.aws.json
