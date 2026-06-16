@@ -99,14 +99,14 @@ jobs:
           docker build -t $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest .
           docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest
 
-      - name: Deploy to EB
-        uses: aws-actions/aws-elasticbeanstalk-deploy@v1.0.2
-        with:
-            application-name: "demo-9271-2087-0716-bookstoreapi"
-            environment-name: "Demo-9271-2087-0716-bookstoreapi-env"
-            version-label: ${{ github.sha }}
-            aws-region: "ap-south-1"
-            deployment-package: Dockerrun.aws.json
+     # - name: Deploy to EB
+     #   uses: aws-actions/aws-elasticbeanstalk-deploy@v1.0.2
+     #   with:
+     #       application-name: "demo-9271-2087-0716-bookstoreapi"
+     #       environment-name: "Demo-9271-2087-0716-bookstoreapi-env"
+     #       version-label: ${{ github.sha }}
+     #       aws-region: "ap-south-1"
+     #       deployment-package: Dockerrun.aws.json
 
       - name: deploy to EKs
         run: |
