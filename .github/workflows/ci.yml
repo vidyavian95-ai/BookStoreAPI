@@ -111,7 +111,7 @@ jobs:
       - name: deploy to EKs
         run: |
           aws eks update-kubeconfig --region ap-south-1 --name bookstoreApi-cluster
-          kubectl apply -f deployment.yaml --validate=false
+          kubectl apply -f deployment/deployment.yaml --validate=false
           kubectl apply -f deployment/service.yaml --validate=false
           kubectl apply -f deployment/ingress.yaml --validate=false
 
