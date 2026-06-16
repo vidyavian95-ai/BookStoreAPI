@@ -108,7 +108,9 @@ jobs:
      #       aws-region: "ap-south-1"
      #       deployment-package: Dockerrun.aws.json
 
-      - name: deploy to EKs
+      - name: deploy to EKS
+        env:
+          AWS_REGION: ap-south-1
         run: |
           aws eks update-kubeconfig --region ap-south-1 --name bookstoreApi-cluster
           kubectl apply -f deployment/deployment.yaml --validate=false
@@ -116,8 +118,11 @@ jobs:
           kubectl apply -f deployment/ingress.yaml --validate=false
 
       - name: Verify deployment
+        env:
+          AWS_REGION: ap-south-1
         run: |
-          aws eks update-kubeconfig --region ap-south-1 --name demo-eks-cluster
-          kubectl get all
+          kubectl get pods -A
+          kubectl get services
+          kubectl get ingress
       
       
