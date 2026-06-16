@@ -5,13 +5,14 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
-  ingressClassName: tomcat-ingress
-  rules: 
+  ingressClassName: nginx
+  rules:
   - http:
-      paths: 
-      pathtype: Prefix
-      backend:
-        service:
-          name: bookstoreapi-service
-          port:
-            number: 80    
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: bookstoreapi-service
+            port:
+              number: 80    

@@ -108,21 +108,83 @@ jobs:
      #       aws-region: "ap-south-1"
      #       deployment-package: Dockerrun.aws.json
 
-      - name: deploy to EKS
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig --region ap-south-1 --name bookstoreApi-cluster --alias bookstoreApi
+
+      - name: Configure EKS aws-auth for IAM user
+        run: |
+          echo "Checking and configuring aws-auth ConfigMap..."
+          
+          # Get the IAM user ARN
+          IAM_USER_ARN=$(aws sts get-caller-identity --query Arn --output text)
+          echo "Current IAM user: $IAM_USER_ARN"
+          
+          # Check if aws-auth ConfigMap exists
+          if kubectl get configmap aws-auth -n kube-system &>/dev/null; then
+            echo "aws-auth ConfigMap exists, backing it up..."
+            kubectl get configmap aws-auth -n kube-system -o yaml > aws-auth-backup.yaml
+            
+            # Get current mapUsers
+            CURRENT_MAP=$(kubectl get configmap aws-auth -n kube-system -o jsonpath='{.data.mapUsers}' || echo "")
+            
+            # Check if user already exists
+            if echo "$CURRENT_MAP" | grep -q "$IAM_USER_ARN"; then
+              echo "IAM user already configured in aws-auth"
+            else
+              echo "Adding IAM user to existing aws-auth ConfigMap..."
+              kubectl patch configmap aws-auth -n kube-system --patch "$(cat <<EOF
+data:
+  mapUsers: |
+    - userarn: $IAM_USER_ARN
+      username: demo_devops
+      groups:
+        - system:masters
+EOF
+)"
+            fi
+          else
+            echo "aws-auth ConfigMap does not exist, creating it..."
+            kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: aws-auth
+            namespace: kube-system
+          data:
+            mapUsers: |
+              - userarn: $IAM_USER_ARN
+                username: demo_devops
+                groups:
+                  - system:masters
+          EOF
+          fi
+          
+          echo "aws-auth configuration completed"
+          
+      - name: Verify EKS access
+        run: |
+          echo "Testing EKS cluster access..."
+          kubectl version --client
+          kubectl cluster-info
+          kubectl auth can-i get pods --all-namespaces
+          
+      - name: Deploy to EKS
         env:
           AWS_REGION: ap-south-1
+          AWS_DEFAULT_REGION: ap-south-1
         run: |
-          aws eks update-kubeconfig --region ap-south-1 --name bookstoreApi-cluster
+          echo "Deploying to EKS cluster..."
           kubectl apply -f deployment/deployment.yaml --validate=false
           kubectl apply -f deployment/service.yaml --validate=false
           kubectl apply -f deployment/ingress.yaml --validate=false
 
       - name: Verify deployment
-        env:
-          AWS_REGION: ap-south-1
         run: |
-          kubectl get pods -A
-          kubectl get services
-          kubectl get ingress
+          echo "Verifying deployment status..."
+          kubectl get pods -n default
+          kubectl get services -n default
+          kubectl get ingress -n default
+          kubectl rollout status deployment -n default --timeout=5m || true
       
       
