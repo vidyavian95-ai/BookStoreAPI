@@ -270,14 +270,3 @@ jobs:
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
-      
-      build:
-    needs: checkout
-    runs-on: ubuntu-latest
-      
-    steps:  
-      - name: download src code
-        uses: actions/download-artifact@v4
-        with:
-          name: bookstore_api_src_code
-          path: .
