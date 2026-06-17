@@ -1,49 +1,78 @@
-name: java build pipeline
+name: BookStore API CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
-
   pull_request:
     branches:
       - main
-
   workflow_dispatch:
 
 permissions:
   contents: read
   checks: write
   pull-requests: write
-jobs:
-  checkout:
-    runs-on: ubuntu-latest
 
+jobs:
+  # ============================================
+  # STAGE 1: CHECKOUT
+  # ============================================
+  checkout:
+    name: Checkout Source Code
+    runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout src code
+      - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Upload artifact
+      - name: Upload source code artifact
         uses: actions/upload-artifact@v4
         with:
           name: bookstore_api_src_code
           path: .
+          retention-days: 1
 
+  # ============================================
+  # STAGE 2: BUILD (Maven + SpotBugs + SonarQube)
+  # ============================================
   build:
+    name: Build, Test & Code Analysis
     needs: checkout
     runs-on: ubuntu-latest
       
     steps:  
-      - name: download src code
+      - name: Download source code artifact
         uses: actions/download-artifact@v4
         with:
           name: bookstore_api_src_code
           path: .
 
-      - name: verify dir
-        run: ls -lrt && pwd
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: './pom.xml'
 
-      - name: SonarQube Scan
+      - name: Maven Build
+        run: |
+          echo "Building application with Maven..."
+          mvn clean package -DskipTests
+
+      - name: Run SpotBugs Analysis
+        run: |
+          echo "Running SpotBugs static analysis..."
+          mvn spotbugs:spotbugs
+          mvn com.github.spotbugs:spotbugs-maven-plugin:4.8.6.1:check
+
+      - name: Upload SpotBugs Report
+        uses: lcollins/spotbugs-github-action@v3.2.0
+        with:
+          path: '**/spotbugsXml.xml'
+
+      - name: SonarQube Code Quality Scan
         uses: SonarSource/sonarqube-scan-action@v6
         with:
           args: >
@@ -54,28 +83,35 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      - name: Build with Maven
-        run: mvn clean verify com.github.spotbugs:spotbugs-maven-plugin:4.8.6.1:check
-
-      - name: Run SpotBugs
-        run: mvn spotbugs:spotbugs
-
-      - name: Upload SpotBugs Report
-        uses: lcollins/spotbugs-github-action@v3.2.0
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-            path: '**/spotbugsXml.xml'
+          name: bookstore_api_build
+          path: |
+            target/*.jar
+            deployment/
+          retention-days: 1
 
-
-      - name: Java installation
-        uses: actions/setup-java@v4
+  # ============================================
+  # STAGE 3: DEPLOY (Docker + EKS)
+  # ============================================
+  deploy:
+    name: Deploy to EKS Cluster
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download source code artifact
+        uses: actions/download-artifact@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'maven'
-          cache-dependency-path: './pom.xml'
+          name: bookstore_api_src_code
+          path: .
 
-      - name: Maven build & Run Tests
-        run: mvn clean verify -Dspring.profiles.active=test
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bookstore_api_build
+          path: .
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6.1.0
@@ -88,33 +124,29 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-
-      - name: Build, tag, and push docker image to Amazon ECR 
+      - name: Build and Push Docker Image to ECR
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REGISTRY_ALIAS: demodevops
           REPOSITORY: bookstoreapi
-          IMAGE_TAG: latest
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest .
+          echo "Building Docker image..."
+          docker build -t $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG .
+          docker tag $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest
+          
+          echo "Pushing Docker images to ECR..."
+          docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG
           docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest
 
-     # - name: Deploy to EB
-     #   uses: aws-actions/aws-elasticbeanstalk-deploy@v1.0.2
-     #   with:
-     #       application-name: "demo-9271-2087-0716-bookstoreapi"
-     #       environment-name: "Demo-9271-2087-0716-bookstoreapi-env"
-     #       version-label: ${{ github.sha }}
-     #       aws-region: "ap-south-1"
-     #       deployment-package: Dockerrun.aws.json
-
-      - name: Update kubeconfig for EKS
+      - name: Update EKS kubeconfig
         run: |
-          aws eks update-kubeconfig --region ap-south-1 --name demo-devops --alias bookstoreApi
+          echo "Configuring kubectl for EKS cluster..."
+          aws eks update-kubeconfig --region ap-south-1 --name bookstoreApi-cluster --alias bookstoreApi
 
       - name: Configure EKS aws-auth for IAM user
         run: |
-          echo "Checking and configuring aws-auth ConfigMap..."
+          echo "Configuring aws-auth ConfigMap for IAM user access..."
           
           # Get the IAM user ARN
           IAM_USER_ARN=$(aws sts get-caller-identity --query Arn --output text)
@@ -158,31 +190,94 @@ jobs:
             kubectl apply -f aws-auth-config.yaml
           fi
           
-          echo "aws-auth configuration completed"
-          
-      - name: Verify EKS access
+          echo "aws-auth configuration completed successfully"
+
+      - name: Verify EKS Access
         run: |
-          echo "Testing EKS cluster access..."
+          echo "Verifying EKS cluster access..."
           kubectl version --client
           kubectl cluster-info
           kubectl auth can-i get pods --all-namespaces
-          
-      - name: Deploy to EKS
+
+      - name: Deploy to EKS Cluster
         env:
           AWS_REGION: ap-south-1
           AWS_DEFAULT_REGION: ap-south-1
         run: |
-          echo "Deploying to EKS cluster..."
+          echo "Deploying application to EKS cluster..."
           kubectl apply -f deployment/deployment.yaml --validate=false
           kubectl apply -f deployment/service.yaml --validate=false
           kubectl apply -f deployment/ingress.yaml --validate=false
+          echo "Deployment completed successfully"
 
-      - name: Verify deployment
+      - name: Verify Deployment Status
         run: |
           echo "Verifying deployment status..."
+          kubectl get deployments -n default
           kubectl get pods -n default
           kubectl get services -n default
           kubectl get ingress -n default
-          kubectl rollout status deployment -n default --timeout=5m || true
+          
+          echo "Waiting for deployment rollout..."
+          kubectl rollout status deployment/bookstoreapi -n default --timeout=5m
+
+  # ============================================
+  # STAGE 4: TEST CASE EXECUTION
+  # ============================================
+  test:
+    name: Execute Test Cases
+    needs: deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download source code artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bookstore_api_src_code
+          path: .
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: './pom.xml'
+
+      - name: Run Unit Tests
+        run: |
+          echo "Running unit tests..."
+          mvn test -Dspring.profiles.active=test
+
+      - name: Run Integration Tests
+        run: |
+          echo "Running integration tests..."
+          mvn verify -Dspring.profiles.active=test
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            target/surefire-reports/*.xml
+            target/failsafe-reports/*.xml
+
+      - name: Upload Test Coverage Report
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: target/site/jacoco/jacoco.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
       
+      build:
+    needs: checkout
+    runs-on: ubuntu-latest
       
+    steps:  
+      - name: download src code
+        uses: actions/download-artifact@v4
+        with:
+          name: bookstore_api_src_code
+          path: .
