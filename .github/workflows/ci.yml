@@ -267,7 +267,7 @@ jobs:
           # Use eksctl to create IAM identity mapping
           echo "Creating IAM identity mapping for demo_devops user..."
           eksctl create iamidentitymapping \
-            --cluster bookstoreApi-cluster \
+            --cluster demo-devops \
             --region ap-south-1 \
             --arn $IAM_USER_ARN \
             --username demo_devops \
@@ -281,7 +281,7 @@ jobs:
             echo "IAM identity mapping created successfully"
           else
             echo "Attempting to get existing mappings..."
-            eksctl get iamidentitymapping --cluster bookstoreApi-cluster --region ap-south-1 || true
+            eksctl get iamidentitymapping --cluster demo-devops --region ap-south-1 || true
           fi
           
           echo "aws-auth configuration completed"
@@ -318,7 +318,7 @@ jobs:
 
       - name: Update EKS kubeconfig
         run: |
-          aws eks update-kubeconfig --region ap-south-1 --name bookstoreApi-cluster --alias bookstoreApi
+          aws eks update-kubeconfig --region ap-south-1 --name demo-devops --alias bookstoreApi
 
       - name: Deploy Application to EKS
         env:
