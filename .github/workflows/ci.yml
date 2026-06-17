@@ -110,7 +110,7 @@ jobs:
 
       - name: Update kubeconfig for EKS
         run: |
-          aws eks update-kubeconfig --region ap-south-1 --name bookstoreApi-cluster --alias bookstoreApi
+          aws eks update-kubeconfig --region ap-south-1 --name demo-devops --alias bookstoreApi
 
       - name: Configure EKS aws-auth for IAM user
         run: |
