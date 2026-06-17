@@ -180,7 +180,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: bookstore_api_build
+          name: bookstore_api_src_code
           path: .
 
       - name: Configure AWS Credentials
@@ -358,7 +358,7 @@ jobs:
   # Sub-Stage 4.1: Unit Tests
   unit-tests:
     name: "Stage 4.1: Unit Tests"
-    needs: deploy-to-eks
+    needs: [ deploy-to-eks, spotbugs-analysis, sonarqube-analysis ]
     runs-on: ubuntu-latest
     
     steps:
