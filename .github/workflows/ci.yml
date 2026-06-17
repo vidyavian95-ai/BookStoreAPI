@@ -166,6 +166,7 @@ jobs:
   # Sub-Stage 3.1: Build and Push Docker Image
   docker-build-push:
     name: "Stage 3.1: Build & Push Docker Image"
+    needs: checkout
    # needs: [spotbugs-analysis, sonarqube-analysis]
     runs-on: ubuntu-latest
     
