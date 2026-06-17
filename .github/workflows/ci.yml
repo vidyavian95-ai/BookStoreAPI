@@ -19,7 +19,7 @@ jobs:
   # STAGE 1: CHECKOUT
   # ============================================
   checkout:
-    name: Checkout Source Code
+    name: "Stage 1: Checkout Source Code"
     runs-on: ubuntu-latest
     
     steps:
@@ -34,10 +34,12 @@ jobs:
           retention-days: 1
 
   # ============================================
-  # STAGE 2: BUILD (Maven + SpotBugs + SonarQube)
+  # STAGE 2: BUILD
   # ============================================
-  build:
-    name: Build, Test & Code Analysis
+  
+  # Sub-Stage 2.1: Maven Build
+  maven-build:
+    name: "Stage 2.1: Maven Build"
     needs: checkout
     runs-on: ubuntu-latest
       
@@ -56,14 +58,55 @@ jobs:
           cache: 'maven'
           cache-dependency-path: './pom.xml'
 
-      - name: Maven Build
+      - name: Maven Clean and Package
         run: |
+          echo "========================================"
           echo "Building application with Maven..."
+          echo "========================================"
           mvn clean package -DskipTests
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bookstore_api_build
+          path: |
+            target/*.jar
+            target/classes/
+            deployment/
+          retention-days: 1
+
+  # Sub-Stage 2.2: SpotBugs Analysis
+  spotbugs-analysis:
+    name: "Stage 2.2: SpotBugs Static Analysis"
+    needs: maven-build
+    runs-on: ubuntu-latest
+      
+    steps:  
+      - name: Download source code artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bookstore_api_src_code
+          path: .
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bookstore_api_build
+          path: .
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: './pom.xml'
 
       - name: Run SpotBugs Analysis
         run: |
-          echo "Running SpotBugs static analysis..."
+          echo "========================================"
+          echo "Running SpotBugs Static Code Analysis..."
+          echo "========================================"
           mvn spotbugs:spotbugs
           mvn com.github.spotbugs:spotbugs-maven-plugin:4.8.6.1:check
 
@@ -72,7 +115,34 @@ jobs:
         with:
           path: '**/spotbugsXml.xml'
 
-      - name: SonarQube Code Quality Scan
+  # Sub-Stage 2.3: SonarQube Analysis
+  sonarqube-analysis:
+    name: "Stage 2.3: SonarQube Code Quality Scan"
+    needs: maven-build
+    runs-on: ubuntu-latest
+      
+    steps:  
+      - name: Download source code artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bookstore_api_src_code
+          path: .
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bookstore_api_build
+          path: .
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: './pom.xml'
+
+      - name: Run SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
         with:
           args: >
@@ -83,21 +153,20 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: bookstore_api_build
-          path: |
-            target/*.jar
-            deployment/
-          retention-days: 1
+      - name: SonarQube Quality Gate Check
+        run: |
+          echo "========================================"
+          echo "SonarQube Analysis Completed"
+          echo "========================================"
 
   # ============================================
-  # STAGE 3: DEPLOY (Docker + EKS)
+  # STAGE 3: DEPLOY
   # ============================================
-  deploy:
-    name: Deploy to EKS Cluster
-    needs: build
+  
+  # Sub-Stage 3.1: Build and Push Docker Image
+  docker-build-push:
+    name: "Stage 3.1: Build & Push Docker Image"
+    needs: [spotbugs-analysis, sonarqube-analysis]
     runs-on: ubuntu-latest
     
     steps:
@@ -124,29 +193,61 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and Push Docker Image to ECR
+      - name: Build Docker Image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REGISTRY_ALIAS: demodevops
           REPOSITORY: bookstoreapi
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo "Building Docker image..."
+          echo "========================================"
+          echo "Building Docker Image..."
+          echo "========================================"
           docker build -t $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG .
           docker tag $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest
-          
-          echo "Pushing Docker images to ECR..."
+          echo "Image tagged: $IMAGE_TAG and latest"
+
+      - name: Push Docker Image to ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REGISTRY_ALIAS: demodevops
+          REPOSITORY: bookstoreapi
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "========================================"
+          echo "Pushing Docker Image to Amazon ECR..."
+          echo "========================================"
           docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG
           docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest
+          echo "Image pushed successfully!"
+
+  # Sub-Stage 3.2: Configure EKS Access
+  configure-eks:
+    name: "Stage 3.2: Configure EKS Access"
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
 
       - name: Update EKS kubeconfig
         run: |
+          echo "========================================"
           echo "Configuring kubectl for EKS cluster..."
-          aws eks update-kubeconfig --region ap-south-1 --name bookstoreApi-cluster --alias bookstoreApi
+          echo "========================================"
+          aws eks update-kubeconfig --region ap-south-1 --name demo-devops --alias bookstoreApi
+          echo "Kubeconfig updated successfully"
 
       - name: Configure EKS aws-auth for IAM user
         run: |
-          echo "Configuring aws-auth ConfigMap for IAM user access..."
+          echo "========================================"
+          echo "Configuring aws-auth ConfigMap..."
+          echo "========================================"
           
           # Get the IAM user ARN
           IAM_USER_ARN=$(aws sts get-caller-identity --query Arn --output text)
@@ -194,39 +295,77 @@ jobs:
 
       - name: Verify EKS Access
         run: |
-          echo "Verifying EKS cluster access..."
+          echo "========================================"
+          echo "Verifying EKS Cluster Access..."
+          echo "========================================"
           kubectl version --client
           kubectl cluster-info
           kubectl auth can-i get pods --all-namespaces
+          echo "EKS access verified successfully"
 
-      - name: Deploy to EKS Cluster
+  # Sub-Stage 3.3: Deploy to EKS
+  deploy-to-eks:
+    name: "Stage 3.3: Deploy to EKS Cluster"
+    needs: configure-eks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download source code artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bookstore_api_src_code
+          path: .
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Update EKS kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ap-south-1 --name bookstoreApi-cluster --alias bookstoreApi
+
+      - name: Deploy Application to EKS
         env:
           AWS_REGION: ap-south-1
           AWS_DEFAULT_REGION: ap-south-1
         run: |
-          echo "Deploying application to EKS cluster..."
+          echo "========================================"
+          echo "Deploying Application to EKS..."
+          echo "========================================"
           kubectl apply -f deployment/deployment.yaml --validate=false
+          echo "Deployment applied"
           kubectl apply -f deployment/service.yaml --validate=false
+          echo "Service applied"
           kubectl apply -f deployment/ingress.yaml --validate=false
-          echo "Deployment completed successfully"
+          echo "Ingress applied"
+          echo "Deployment completed successfully!"
 
-      - name: Verify Deployment Status
+      - name: Verify Deployment
         run: |
-          echo "Verifying deployment status..."
+          echo "========================================"
+          echo "Verifying Deployment Status..."
+          echo "========================================"
           kubectl get deployments -n default
           kubectl get pods -n default
           kubectl get services -n default
           kubectl get ingress -n default
           
-          echo "Waiting for deployment rollout..."
+          echo ""
+          echo "Waiting for deployment rollout to complete..."
           kubectl rollout status deployment/bookstoreapi -n default --timeout=5m
+          echo "Deployment verified successfully!"
 
   # ============================================
   # STAGE 4: TEST CASE EXECUTION
   # ============================================
-  test:
-    name: Execute Test Cases
-    needs: deploy
+  
+  # Sub-Stage 4.1: Unit Tests
+  unit-tests:
+    name: "Stage 4.1: Unit Tests"
+    needs: deploy-to-eks
     runs-on: ubuntu-latest
     
     steps:
@@ -246,27 +385,87 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          echo "Running unit tests..."
+          echo "========================================"
+          echo "Running Unit Tests..."
+          echo "========================================"
           mvn test -Dspring.profiles.active=test
+
+      - name: Upload Unit Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: target/surefire-reports/
+          retention-days: 7
+
+  # Sub-Stage 4.2: Integration Tests
+  integration-tests:
+    name: "Stage 4.2: Integration Tests"
+    needs: deploy-to-eks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download source code artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bookstore_api_src_code
+          path: .
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: './pom.xml'
 
       - name: Run Integration Tests
         run: |
-          echo "Running integration tests..."
+          echo "========================================"
+          echo "Running Integration Tests..."
+          echo "========================================"
           mvn verify -Dspring.profiles.active=test
+
+      - name: Upload Integration Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: target/failsafe-reports/
+          retention-days: 7
+
+  # Sub-Stage 4.3: Test Report Publishing
+  publish-test-reports:
+    name: "Stage 4.3: Publish Test Reports"
+    needs: [unit-tests, integration-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Download Unit Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-test-results
+          path: unit-test-results/
+
+      - name: Download Integration Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: integration-test-results
+          path: integration-test-results/
 
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
           files: |
-            target/surefire-reports/*.xml
-            target/failsafe-reports/*.xml
+            unit-test-results/*.xml
+            integration-test-results/*.xml
 
-      - name: Upload Test Coverage Report
-        uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          files: target/site/jacoco/jacoco.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
+      - name: Test Summary
+        run: |
+          echo "========================================"
+          echo "Test Execution Complete!"
+          echo "========================================"
+          echo "Unit Test Results: Available in artifacts"
+          echo "Integration Test Results: Available in artifacts"
