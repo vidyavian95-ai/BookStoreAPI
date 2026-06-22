@@ -259,7 +259,7 @@ jobs:
           echo "Current kubeconfig context:"
           kubectl config current-context
 
-      - name: Verify EKS Access
+      - name: Verify EKS Access with Retry
         run: |
           echo "========================================"
           echo "Testing EKS Cluster Access..."
@@ -268,35 +268,54 @@ jobs:
           echo ""
           echo "Attempting to access cluster..."
           
-          # Test cluster access
-          if kubectl get nodes 2>&1 | tee kubectl-test.log | grep -qv "Unauthorized\|credentials\|forbidden"; then
-            echo "✓ EKS access verified successfully"
+          # Retry logic with exponential backoff
+          MAX_ATTEMPTS=5
+          ATTEMPT=1
+          WAIT_TIME=10
+          SUCCESS=false
+          
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             echo ""
-            echo "Cluster nodes:"
-            kubectl get nodes
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+            
+            if kubectl get nodes 2>&1 | tee kubectl-test.log; then
+              if ! grep -qE "Unauthorized|credentials|forbidden" kubectl-test.log; then
+                echo "✓ EKS access verified successfully"
+                echo ""
+                echo "Cluster nodes:"
+                kubectl get nodes
+                echo ""
+                echo "Checking permissions..."
+                kubectl auth can-i get pods --all-namespaces || true
+                SUCCESS=true
+                break
+              fi
+            fi
+            
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              echo "❌ EKS access failed. Retrying in ${WAIT_TIME}s..."
+              sleep $WAIT_TIME
+              WAIT_TIME=$((WAIT_TIME * 2))
+            fi
+            
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+          
+          if [ "$SUCCESS" = false ]; then
             echo ""
-            echo "Checking permissions..."
-            kubectl auth can-i get pods --all-namespaces || true
-          else
-            echo "✗ Unable to access EKS cluster"
+            echo "✗ Unable to access EKS cluster after $MAX_ATTEMPTS attempts"
             echo ""
             echo "Authentication Error Detected!"
             echo "---------------------------------------"
-            echo "The IAM user needs to be added to the aws-auth ConfigMap"
-            echo ""
             echo "Current IAM User: $(aws sts get-caller-identity --query Arn --output text)"
             echo ""
-            echo "SOLUTION: Run this command from a machine with cluster admin access:"
-            echo ""
-            echo "eksctl create iamidentitymapping \\"
-            echo "  --cluster bookstoreapi-cluster \\"
-            echo "  --region ap-south-1 \\"
-            echo "  --arn $(aws sts get-caller-identity --query Arn --output text) \\"
-            echo "  --username demo_devops \\"
-            echo "  --group system:masters"
-            echo ""
-            echo "Or manually edit aws-auth ConfigMap with:"
-            echo "kubectl edit configmap aws-auth -n kube-system"
+            echo "Debugging checklist:"
+            echo "1. Verify IAM user has eks:DescribeCluster permission"
+            echo "2. Check aws-auth ConfigMap:"
+            echo "   kubectl get configmap aws-auth -n kube-system -o yaml"
+            echo "3. Verify user is in mapUsers section with correct ARN"
+            echo "4. Check kubeconfig:"
+            echo "   cat ~/.kube/config"
             echo ""
             exit 1
           fi
