@@ -177,11 +177,11 @@ jobs:
           name: bookstore_api_src_code
           path: .
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: bookstore_api_src_code
-          path: .
+      #- name: Download build artifacts
+      #  uses: actions/download-artifact@v4
+      #  with:
+      #    name: bookstore_api_src_code
+      #    path: .
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6.1.0
@@ -236,65 +236,70 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
+      - name: Verify AWS Identity
+        run: |
+          echo "========================================"
+          echo "Verifying AWS Identity..."
+          echo "========================================"
+          IAM_USER_ARN=$(aws sts get-caller-identity --query Arn --output text)
+          IAM_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "IAM User ARN: $IAM_USER_ARN"
+          echo "Account ID: $IAM_ACCOUNT_ID"
+          echo ""
+
       - name: Update EKS kubeconfig
         run: |
           echo "========================================"
           echo "Configuring kubectl for EKS cluster..."
           echo "========================================"
-          aws eks update-kubeconfig --region ap-south-1 --name demo-devops --alias bookstoreApi
+          # Update kubeconfig for the correct cluster name
+          aws eks update-kubeconfig --region ap-south-1 --name bookstoreapi-cluster
           echo "Kubeconfig updated successfully"
-
-      - name: Configure EKS aws-auth for IAM user using AWS CLI
-        run: |
-          echo "========================================"
-          echo "Configuring aws-auth ConfigMap via AWS CLI..."
-          echo "========================================"
-          
-          # Get the IAM user ARN
-          IAM_USER_ARN=$(aws sts get-caller-identity --query Arn --output text)
-          IAM_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "Current IAM user: $IAM_USER_ARN"
-          echo "Account ID: $IAM_ACCOUNT_ID"
-          
-          # Install eksctl if not available
-          if ! command -v eksctl &> /dev/null; then
-            echo "Installing eksctl..."
-            curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-            sudo mv /tmp/eksctl /usr/local/bin
-            echo "eksctl installed successfully"
-          fi
-          
-          # Use eksctl to create IAM identity mapping
-          echo "Creating IAM identity mapping for demo_devops user..."
-          eksctl create iamidentitymapping \
-            --cluster demo-devops \
-            --region ap-south-1 \
-            --arn $IAM_USER_ARN \
-            --username demo_devops \
-            --group system:masters \
-            --no-duplicate-arns 2>&1 | tee eksctl-output.log || true
-          
-          # Check if the mapping was created or already exists
-          if grep -q "already exists" eksctl-output.log; then
-            echo "IAM identity mapping already exists"
-          elif grep -q "created" eksctl-output.log || grep -q "successfully" eksctl-output.log; then
-            echo "IAM identity mapping created successfully"
-          else
-            echo "Attempting to get existing mappings..."
-            eksctl get iamidentitymapping --cluster demo-devops --region ap-south-1 || true
-          fi
-          
-          echo "aws-auth configuration completed"
+          echo ""
+          echo "Current kubeconfig context:"
+          kubectl config current-context
 
       - name: Verify EKS Access
         run: |
           echo "========================================"
-          echo "Verifying EKS Cluster Access..."
+          echo "Testing EKS Cluster Access..."
           echo "========================================"
           kubectl version --client
-          kubectl cluster-info
-          kubectl auth can-i get pods --all-namespaces
-          echo "EKS access verified successfully"
+          echo ""
+          echo "Attempting to access cluster..."
+          
+          # Test cluster access
+          if kubectl get nodes 2>&1 | tee kubectl-test.log | grep -qv "Unauthorized\|credentials\|forbidden"; then
+            echo "✓ EKS access verified successfully"
+            echo ""
+            echo "Cluster nodes:"
+            kubectl get nodes
+            echo ""
+            echo "Checking permissions..."
+            kubectl auth can-i get pods --all-namespaces || true
+          else
+            echo "✗ Unable to access EKS cluster"
+            echo ""
+            echo "Authentication Error Detected!"
+            echo "---------------------------------------"
+            echo "The IAM user needs to be added to the aws-auth ConfigMap"
+            echo ""
+            echo "Current IAM User: $(aws sts get-caller-identity --query Arn --output text)"
+            echo ""
+            echo "SOLUTION: Run this command from a machine with cluster admin access:"
+            echo ""
+            echo "eksctl create iamidentitymapping \\"
+            echo "  --cluster bookstoreapi-cluster \\"
+            echo "  --region ap-south-1 \\"
+            echo "  --arn $(aws sts get-caller-identity --query Arn --output text) \\"
+            echo "  --username demo_devops \\"
+            echo "  --group system:masters"
+            echo ""
+            echo "Or manually edit aws-auth ConfigMap with:"
+            echo "kubectl edit configmap aws-auth -n kube-system"
+            echo ""
+            exit 1
+          fi
 
   # Sub-Stage 3.3: Deploy to EKS
   deploy-to-eks:
@@ -318,7 +323,7 @@ jobs:
 
       - name: Update EKS kubeconfig
         run: |
-          aws eks update-kubeconfig --region ap-south-1 --name demo-devops --alias bookstoreApi
+          aws eks update-kubeconfig --region ap-south-1 --name bookstoreapi-cluster
 
       - name: Deploy Application to EKS
         env:
