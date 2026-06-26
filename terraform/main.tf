@@ -1,6 +1,25 @@
+terraform {
+  required_version = ">= 1.0"
+  
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+  # Credentials will be read from:
+  # 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+  # 2. AWS credentials file (~/.aws/credentials)
+  # 3. IAM role (if running on EC2/ECS)
+}
+
 # VPC for EKS
 module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+  source  = "terraform-aws-modules/vpc/aws"
   version = "5.1.2"
 
   name = "${var.project_name}-vpc"
@@ -72,7 +91,7 @@ resource "aws_ecr_lifecycle_policy" "bookstore_api" {
 # EKS Cluster
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 19.0"
+  version = "~> 20.0"
 
   cluster_name    = var.cluster_name
   cluster_version = var.kubernetes_version
@@ -80,7 +99,28 @@ module "eks" {
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
+  # Cluster access configuration
   cluster_endpoint_public_access = true
+
+  # Enable IRSA (IAM Roles for Service Accounts)
+  enable_irsa = true
+
+  # Cluster access entries (replaces enable_cluster_creator_admin_permissions)
+  access_entries = {
+    admin = {
+      principal_arn = data.aws_caller_identity.current.arn
+      type          = "STANDARD"
+
+      policy_associations = {
+        admin = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = {
+            type = "cluster"
+          }
+        }
+      }
+    }
+  }
 
   # EKS Managed Node Group
   eks_managed_node_groups = {
@@ -105,11 +145,11 @@ module "eks" {
     }
   }
 
-  # Cluster access entry
-  enable_cluster_creator_admin_permissions = true
-
   tags = var.tags
 }
+
+# Get current AWS account ID
+data "aws_caller_identity" "current" {}
 
 # IAM Role for ECR Access
 resource "aws_iam_role" "ecr_access" {
