@@ -125,7 +125,7 @@ module "eks" {
   # EKS Managed Node Group
   eks_managed_node_groups = {
     linux_nodes = {
-      name = "${var.cluster_name}-linux-nodes"
+      name = "nodes"  # Shortened to avoid IAM role name length issues
 
       instance_types = [var.node_instance_type]
       capacity_type  = "ON_DEMAND"
@@ -135,6 +135,10 @@ module "eks" {
       desired_size = var.node_desired_size
 
       disk_size = 20
+
+      # Use custom IAM role name to avoid length issues
+      iam_role_name            = "${var.project_name}-node-role"
+      iam_role_use_name_prefix = false
 
       labels = {
         Environment = var.environment
