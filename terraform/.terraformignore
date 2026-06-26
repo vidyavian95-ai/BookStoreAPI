@@ -1,0 +1,15 @@
+# Ignore bootstrap directory - this is for one-time backend setup only
+bootstrap/
+
+# Documentation
+*.md
+README.md
+STATEFILE-SETUP.md
+QUICK-START.md
+
+# Scripts
+*.sh
+*.ps1
+
+# Examples
+*.example

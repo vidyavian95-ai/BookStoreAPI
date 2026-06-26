@@ -45,7 +45,8 @@ This Terraform configuration provisions the following AWS resources:
 **Important:** Set up S3 backend for state management before running Terraform.
 
 ```bash
-cd terraform
+# Navigate to bootstrap directory
+cd terraform/bootstrap
 
 # Option 1: Use the automated script
 chmod +x setup-backend.sh
@@ -53,14 +54,17 @@ chmod +x setup-backend.sh
 
 # Option 2: Manual setup using Terraform
 terraform init
-terraform apply -auto-approve
+terraform apply
+
+# Go back to main terraform directory
+cd ..
 ```
 
 This creates:
 - S3 bucket: `bookstoreapi-terraform-state` (for state storage)
 - DynamoDB table: `bookstoreapi-terraform-locks` (for state locking)
 
-See `STATEFILE-SETUP.md` for detailed information.
+See `bootstrap/README.md` or `STATEFILE-SETUP.md` for detailed information.
 
 ### 1. Initialize Terraform with Remote Backend
 
