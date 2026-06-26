@@ -19,7 +19,7 @@ variable "environment" {
 variable "cluster_name" {
   description = "EKS cluster name"
   type        = string
-  default     = "bookstoreapi-cluster"
+  default     = "bookstoreapi-eks-cluster"
 }
 
 variable "kubernetes_version" {

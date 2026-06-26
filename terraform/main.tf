@@ -96,6 +96,10 @@ module "eks" {
   cluster_name    = var.cluster_name
   cluster_version = var.kubernetes_version
 
+  # CloudWatch logging configuration
+  cluster_enabled_log_types              = []  # Disable CloudWatch logs to avoid conflicts
+  create_cloudwatch_log_group            = false
+
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
