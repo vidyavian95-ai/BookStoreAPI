@@ -28,7 +28,7 @@ on:
 
 env:
   AWS_REGION: ap-south-1
-  TF_VERSION: 1.6.0
+  TF_VERSION: 1.10.3  # Updated to fix GPG key expiration issue
 
 jobs:
   terraform-validate:
@@ -52,7 +52,7 @@ jobs:
         continue-on-error: true
 
       - name: Terraform Init
-        run: terraform init -backend=false
+        run: terraform init -backend=false -upgrade
 
       - name: Terraform Validate
         run: terraform validate
@@ -83,7 +83,7 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         id: plan
@@ -157,7 +157,7 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Download Plan
         uses: actions/download-artifact@v4
@@ -209,7 +209,7 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Destroy
         run: terraform destroy -auto-approve
