@@ -197,29 +197,27 @@ jobs:
       - name: Build Docker Image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REGISTRY_ALIAS: demodevops
           REPOSITORY: bookstoreapi
           IMAGE_TAG: ${{ github.sha }}
         run: |
           echo "========================================"
           echo "Building Docker Image..."
           echo "========================================"
-          docker build -t $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG .
-          docker tag $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+          docker tag $REGISTRY/$REPOSITORY:$IMAGE_TAG $REGISTRY/$REPOSITORY:latest
           echo "Image tagged: $IMAGE_TAG and latest"
 
       - name: Push Docker Image to ECR
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REGISTRY_ALIAS: demodevops
           REPOSITORY: bookstoreapi
           IMAGE_TAG: ${{ github.sha }}
         run: |
           echo "========================================"
           echo "Pushing Docker Image to Amazon ECR..."
           echo "========================================"
-          docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:$IMAGE_TAG
-          docker push $REGISTRY/$REGISTRY_ALIAS/$REPOSITORY:latest
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+          docker push $REGISTRY/$REPOSITORY:latest
           echo "Image pushed successfully!"
 
   # Sub-Stage 3.2: Configure EKS Access
@@ -269,7 +267,7 @@ jobs:
 
       - name: Update EKS kubeconfig
         run: |
-          aws eks update-kubeconfig --region ap-south-1 --name bookstoreapi-cluster
+          aws eks update-kubeconfig --region ap-south-1 --name bookstoreapi-eks-cluster
 
       - name: Deploy Application to EKS
         env:

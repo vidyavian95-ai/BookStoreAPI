@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: bookstoreapi
-        image: 927120870716.dkr.ecr.ap-south-1.amazonaws.com/demodevops/bookstoreapi:latest
+        image: 927120870716.dkr.ecr.ap-south-1.amazonaws.com/bookstoreapi:latest
         ports:
         - containerPort: 8080
         resources:
