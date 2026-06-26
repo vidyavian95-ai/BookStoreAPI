@@ -275,6 +275,16 @@ jobs:
           AWS_DEFAULT_REGION: ap-south-1
         run: |
           echo "========================================"
+          echo "Deploying MySQL Database..."
+          echo "========================================"
+          kubectl apply -f deployment/mysql-deployment.yaml
+          echo "MySQL deployment applied"
+          
+          echo "Waiting for MySQL to be ready (timeout: 5 minutes)..."
+          kubectl wait --for=condition=ready pod -l app=mysql --timeout=300s || echo "Warning: MySQL pod not ready yet, continuing..."
+          
+          echo ""
+          echo "========================================"
           echo "Deploying Application to EKS..."
           echo "========================================"
           kubectl apply -f deployment/deployment.yaml --validate=false
@@ -290,14 +300,26 @@ jobs:
           echo "========================================"
           echo "Verifying Deployment Status..."
           echo "========================================"
+          
+          echo "MySQL Status:"
+          kubectl get pods -l app=mysql -n default
+          
+          echo ""
+          echo "Application Status:"
           kubectl get deployments -n default
           kubectl get pods -n default
           kubectl get services -n default
           kubectl get ingress -n default
           
           echo ""
-          echo "Waiting for deployment rollout to complete..."
+          echo "Waiting for application deployment rollout to complete..."
           kubectl rollout status deployment/bookstoreapi -n default --timeout=5m
+          
+          echo ""
+          echo "Application Logs (last 20 lines):"
+          kubectl logs -l app=bookstoreapi --tail=20 -n default || echo "No logs available yet"
+          
+          echo ""
           echo "Deployment verified successfully!"
 
   # ============================================
